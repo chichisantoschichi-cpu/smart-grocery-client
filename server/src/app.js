@@ -3,6 +3,7 @@ import cors from 'cors';
 import logger from './middleware/logger.js';
 import notFound from './middleware/notFound.js';
 import errorHandler from './middleware/errorHandler.js';
+import categoryRoutes from './routes/categoryRoutes.js';
 
 const app = express();
 
@@ -13,6 +14,8 @@ app.use(express.json());
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
+
+app.use('/api/categories', categoryRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
