@@ -1,25 +1,28 @@
-﻿export type { Budget } from "./budget";
+export type { Budget, BudgetHealth, BudgetStatus } from "./budget";
 
-export type { Product } from "./product";
+export type {
+  Product,
+  StockStatus,
+  LowStockProduct,
+  LowStockResponse,
+  PriceHistory,
+  PriceHistoryEntry,
+} from "./product";
 
 export type { Category } from "./category";
 
-export type {
-  Purchase,
-  PurchaseItem,
-} from "./purchase";
+export type { Purchase, PurchaseItem } from "./purchase";
 
 export type { Store } from "./store";
 
-export type {
-  ShoppingList,
-  ShoppingListItem,
-} from "./shoppingList";
+export type { ShoppingList, ShoppingListItem } from "./shoppingList";
 
 export type {
-  CategorySpending,
-  MonthlySpending,
-  WeeklySpending,
-  PriceTrend,
-  SpendingSummary,
+  AnalyticsSummary,
+  MonthSpending,
+  MonthlySpendingReport,
+  CategoryShare,
+  CategoryBreakdown,
+  StorePrice,
+  StoreComparison,
 } from "./analytics";

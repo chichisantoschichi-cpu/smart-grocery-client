@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 
 const purchaseItemSchema = z.object({
   productId: z
@@ -25,7 +25,7 @@ const purchaseItemSchema = z.object({
 });
 
 export const purchaseSchema = z.object({
-  store: z
+  storeId: z
     .string()
     .min(1, "Please select a store."),
 

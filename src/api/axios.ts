@@ -8,8 +8,12 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message =
-      error.response?.data?.message ?? error.message ?? "Something went wrong";
+    const data = error.response?.data;
+    let message = data?.message ?? error.message ?? "Something went wrong";
+    // Mongoose validation errors come with a per-field map; show them in the message
+    if (data?.errors) {
+      message = `${message}: ${Object.values(data.errors).join(", ")}`;
+    }
     return Promise.reject(new Error(message));
   }
 );
