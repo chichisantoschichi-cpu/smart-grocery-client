@@ -48,9 +48,11 @@ const buildItems = async (purchaseId, rawItems) => {
 const adjustStock = async (items, sign) => {
   await Promise.all(
     items.map((item) =>
-      Product.updateOne({ _id: item.productId }, [
-        { $set: { stock: { $max: [0, { $add: ['$stock', sign * item.quantity] }] } } },
-      ])
+      Product.updateOne(
+        { _id: item.productId },
+        [{ $set: { stock: { $max: [0, { $add: ['$stock', sign * item.quantity] }] } } }],
+        { updatePipeline: true }
+      )
     )
   );
 };

@@ -11,8 +11,13 @@ const SORT_OPTIONS = {
   newest: { createdAt: -1 },
 };
 
+// Flattens the populated category into categoryId + categoryName and adds a stock status
 const withStockStatus = (product) => {
-  const json = product.toJSON();
+  const { categoryId, ...json } = product.toJSON();
+  const category = product.populated('categoryId') ? categoryId : null;
+  json.categoryId = category ? category.id : String(categoryId);
+  json.categoryName = category?.name;
+
   let stockStatus = 'in-stock';
   if (json.stock === 0) stockStatus = 'out-of-stock';
   else if (json.stock <= json.minStock) stockStatus = 'low-stock';
@@ -172,7 +177,7 @@ export const updateProduct = async (req, res) => {
   const product = await Product.findByIdAndUpdate(
     req.params.id,
     { name, categoryId, unit, price, stock, minStock },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
   if (!product) {
     return res.status(404).json({ message: 'Product not found' });

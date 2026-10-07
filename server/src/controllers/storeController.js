@@ -29,7 +29,7 @@ export const updateStore = async (req, res) => {
   const store = await Store.findByIdAndUpdate(
     req.params.id,
     { name, location, contactNumber },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
   if (!store) {
     return res.status(404).json({ message: 'Store not found' });

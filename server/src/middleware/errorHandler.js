@@ -1,6 +1,4 @@
 const errorHandler = (err, req, res, next) => {
-  console.error(err);
-
   if (err.name === 'ValidationError') {
     const errors = Object.fromEntries(
       Object.entries(err.errors).map(([field, e]) => [field, e.message])
@@ -21,6 +19,8 @@ const errorHandler = (err, req, res, next) => {
     return res.status(400).json({ message: 'Invalid JSON in request body' });
   }
 
+  // Only unexpected errors are logged; the cases above are normal 400 responses
+  console.error(err);
   res.status(err.statusCode || 500).json({
     message: err.message || 'Internal server error',
   });

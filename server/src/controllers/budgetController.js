@@ -92,7 +92,7 @@ export const updateBudget = async (req, res) => {
   const budget = await Budget.findByIdAndUpdate(
     req.params.id,
     { month, year, amount },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
   if (!budget) {
     return res.status(404).json({ message: 'Budget not found' });
