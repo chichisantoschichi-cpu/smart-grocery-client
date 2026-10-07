@@ -2,14 +2,13 @@
 import { Link } from "react-router";
 
 import CategoryTable from "../../components/tables/CategoryTable";
-import { groceryProducts, purchasesData } from "../../data/mockData";
-import { categoriesData } from "../../data/categoryData";
+import { useCategories } from "../../hooks/useCategories";
 
 function CategoriesPage() {
+  const { categories, loading, error, refetch, deleteCategory } = useCategories();
+
   const [search, setSearch] = useState("");
-  const [sortOrder, setSortOrder] = useState(
-    "name",
-  );
+  const [sortOrder, setSortOrder] = useState("name");
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-PH", {
@@ -18,169 +17,102 @@ function CategoriesPage() {
       maximumFractionDigits: 0,
     }).format(value);
 
-  const categoriesWithStats = useMemo(() => {
-    return categoriesData.map(
-      (category) => {
-        const productCount =
-          groceryProducts.filter(
-            (product) =>
-              product.category ===
-              category.name,
-          ).length;
+  const categoriesWithStats = useMemo(
+    () =>
+      categories.map((category) => ({
+        ...category,
+        description: category.description ?? "",
+        productCount: category.productCount ?? 0,
+        spending: category.totalSpending ?? 0,
+      })),
+    [categories],
+  );
 
-        const spending =
-          purchasesData.reduce(
-            (purchaseTotal, purchase) => {
-              const categoryTotal =
-                purchase.items
-                  .filter(
-                    (item) =>
-                      item.category ===
-                      category.name,
-                  )
-                  .reduce(
-                    (sum, item) =>
-                      sum + item.subtotal,
-                    0,
-                  );
+  const filteredCategories = useMemo(() => {
+    const query = search.trim().toLowerCase();
 
-              return (
-                purchaseTotal +
-                categoryTotal
-              );
-            },
-            0,
-          );
-
-        return {
-          ...category,
-          productCount,
-          spending,
-        };
-      },
-    );
-  }, []);
-
-  const filteredCategories =
-    useMemo(() => {
-      const query = search
-        .trim()
-        .toLowerCase();
-
-      const filtered =
-        categoriesWithStats.filter(
-          (category) => {
-            return (
-              !query ||
-              category.name
-                .toLowerCase()
-                .includes(query) ||
-              category.description
-                .toLowerCase()
-                .includes(query)
-            );
-          },
-        );
-
-      return [...filtered].sort(
-        (a, b) => {
-          if (
-            sortOrder ===
-            "products-high"
-          ) {
-            return (
-              b.productCount -
-              a.productCount
-            );
-          }
-
-          if (
-            sortOrder ===
-            "spending-high"
-          ) {
-            return (
-              b.spending -
-              a.spending
-            );
-          }
-
-          return a.name.localeCompare(
-            b.name,
-          );
-        },
-      );
-    }, [
-      categoriesWithStats,
-      search,
-      sortOrder,
-    ]);
-
-  const totalProducts =
-    groceryProducts.length;
-
-  const totalSpending =
-    categoriesWithStats.reduce(
-      (sum, category) =>
-        sum + category.spending,
-      0,
-    );
-
-  const categoriesWithProducts =
-    categoriesWithStats.filter(
+    const filtered = categoriesWithStats.filter(
       (category) =>
-        category.productCount > 0,
-    ).length;
-
-  const highestSpendingCategory =
-    categoriesWithStats.reduce(
-      (highest, category) =>
-        category.spending >
-        highest.spending
-          ? category
-          : highest,
-      categoriesWithStats[0],
+        !query ||
+        category.name.toLowerCase().includes(query) ||
+        category.description.toLowerCase().includes(query),
     );
 
-  const handleDelete = (
-    id: string,
-  ) => {
-    const category =
-      categoriesData.find(
-        (item) => item.id === id,
-      );
+    return [...filtered].sort((a, b) => {
+      if (sortOrder === "products-high") {
+        return b.productCount - a.productCount;
+      }
+      if (sortOrder === "spending-high") {
+        return b.spending - a.spending;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [categoriesWithStats, search, sortOrder]);
 
-    if (!category) {
-      return;
-    }
+  const totalProducts = categoriesWithStats.reduce(
+    (sum, category) => sum + category.productCount,
+    0,
+  );
 
-    const linkedProducts =
-      groceryProducts.filter(
-        (product) =>
-          product.category ===
-          category.name,
-      );
+  const totalSpending = categoriesWithStats.reduce(
+    (sum, category) => sum + category.spending,
+    0,
+  );
 
-    if (linkedProducts.length > 0) {
+  const categoriesWithProducts = categoriesWithStats.filter(
+    (category) => category.productCount > 0,
+  ).length;
+
+  const highestSpendingCategory = categoriesWithStats.reduce(
+    (highest, category) =>
+      category.spending > highest.spending ? category : highest,
+    categoriesWithStats[0],
+  );
+
+  const handleDelete = async (id: string) => {
+    const category = categoriesWithStats.find((item) => item.id === id);
+    if (!category) return;
+
+    if (category.productCount > 0) {
       window.alert(
-        `Cannot delete "${category.name}" because ${linkedProducts.length} product(s) are still using this category.`,
+        `Cannot delete "${category.name}" because ${category.productCount} product(s) are still using this category.`,
       );
-
       return;
     }
 
-    const confirmed =
-      window.confirm(
-        `Delete "${category.name}"?`,
-      );
+    if (!window.confirm(`Delete "${category.name}"?`)) return;
 
-    if (!confirmed) {
-      return;
+    try {
+      await deleteCategory(id);
+      window.alert("Category deleted successfully.");
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to delete category.");
     }
-
-    window.alert(
-      "Category deleted successfully.",
-    );
   };
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
+        Loading categories...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mx-auto max-w-xl rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center">
+        <h2 className="text-lg font-bold text-rose-900">Could not load categories</h2>
+        <p className="mt-2 text-sm text-rose-700">{error}</p>
+        <button
+          type="button"
+          onClick={refetch}
+          className="mt-4 rounded-xl bg-rose-600 px-5 py-2 text-sm font-semibold text-white"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -218,7 +150,7 @@ function CategoriesPage() {
           </p>
 
           <p className="mt-2 text-2xl font-bold text-slate-900">
-            {categoriesData.length}
+            {categories.length}
           </p>
 
           <p className="mt-1 text-xs text-slate-400">
@@ -260,15 +192,11 @@ function CategoriesPage() {
           </p>
 
           <p className="mt-2 truncate text-2xl font-bold text-slate-900">
-            {highestSpendingCategory?.name ??
-              "No data"}
+            {highestSpendingCategory?.name ?? "No data"}
           </p>
 
           <p className="mt-1 text-xs text-emerald-600">
-            {formatCurrency(
-              highestSpendingCategory?.spending ??
-                0,
-            )}{" "}
+            {formatCurrency(highestSpendingCategory?.spending ?? 0)}{" "}
             recorded
           </p>
         </div>
@@ -284,9 +212,7 @@ function CategoriesPage() {
           <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-2xl font-bold text-slate-900">
-                {formatCurrency(
-                  totalSpending,
-                )}
+                {formatCurrency(totalSpending)}
               </h2>
 
               <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
@@ -310,15 +236,11 @@ function CategoriesPage() {
           </p>
 
           <h2 className="mt-2 text-xl font-bold text-slate-900">
-            {highestSpendingCategory?.name ??
-              "No data"}
+            {highestSpendingCategory?.name ?? "No data"}
           </h2>
 
           <p className="mt-1 text-sm text-slate-500">
-            {formatCurrency(
-              highestSpendingCategory?.spending ??
-                0,
-            )}{" "}
+            {formatCurrency(highestSpendingCategory?.spending ?? 0)}{" "}
             in recorded purchases.
           </p>
         </div>
@@ -339,11 +261,7 @@ function CategoriesPage() {
               id="category-search"
               type="search"
               value={search}
-              onChange={(event) =>
-                setSearch(
-                  event.target.value,
-                )
-              }
+              onChange={(event) => setSearch(event.target.value)}
               placeholder="Search category..."
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
             />
@@ -360,24 +278,12 @@ function CategoriesPage() {
             <select
               id="category-sort"
               value={sortOrder}
-              onChange={(event) =>
-                setSortOrder(
-                  event.target.value,
-                )
-              }
+              onChange={(event) => setSortOrder(event.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
             >
-              <option value="name">
-                Name A–Z
-              </option>
-
-              <option value="products-high">
-                Most Products
-              </option>
-
-              <option value="spending-high">
-                Highest Spending
-              </option>
+              <option value="name">Name A–Z</option>
+              <option value="products-high">Most Products</option>
+              <option value="spending-high">Highest Spending</option>
             </select>
           </div>
         </div>
@@ -386,19 +292,15 @@ function CategoriesPage() {
           <p className="text-xs text-slate-400">
             Showing{" "}
             <strong className="text-slate-700">
-              {
-                filteredCategories.length
-              }
+              {filteredCategories.length}
             </strong>{" "}
-            of {categoriesData.length} categories
+            of {categories.length} categories
           </p>
 
           {search && (
             <button
               type="button"
-              onClick={() =>
-                setSearch("")
-              }
+              onClick={() => setSearch("")}
               className="w-fit text-xs font-semibold text-emerald-600 hover:text-emerald-700"
             >
               Clear search
@@ -408,15 +310,10 @@ function CategoriesPage() {
       </section>
 
       {/* Table */}
-      {filteredCategories.length >
-      0 ? (
+      {filteredCategories.length > 0 ? (
         <CategoryTable
-          categories={
-            filteredCategories
-          }
-          onDelete={
-            handleDelete
-          }
+          categories={filteredCategories}
+          onDelete={handleDelete}
         />
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
