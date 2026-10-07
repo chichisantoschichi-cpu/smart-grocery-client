@@ -1,10 +1,34 @@
+import PurchaseItem from '../models/PurchaseItem.js';
 import Category from '../models/Category.js';
 import Product from '../models/Product.js';
 
-// GET /api/categories
+// GET /api/categories (includes productCount and totalSpending)
 export const getCategories = async (req, res) => {
-  const categories = await Category.find().sort({ name: 1 });
-  res.status(200).json(categories);
+  const [categories, productCounts, spendingTotals] = await Promise.all([
+    Category.find().sort({ name: 1 }),
+    Product.aggregate([{ $group: { _id: '$categoryId', count: { $sum: 1 } } }]),
+    PurchaseItem.aggregate([
+      { $lookup: { from: 'products', localField: 'productId', foreignField: '_id', as: 'product' } },
+      { $unwind: '$product' },
+      {
+        $group: {
+          _id: '$product.categoryId',
+          total: { $sum: { $multiply: ['$quantity', '$unitPrice'] } },
+        },
+      },
+    ]),
+  ]);
+
+  const countByCategory = new Map(productCounts.map((p) => [String(p._id), p.count]));
+  const spendingByCategory = new Map(spendingTotals.map((s) => [String(s._id), s.total]));
+
+  const result = categories.map((category) => ({
+    ...category.toJSON(),
+    productCount: countByCategory.get(category.id) ?? 0,
+    totalSpending: Math.round((spendingByCategory.get(category.id) ?? 0) * 100) / 100,
+  }));
+
+  res.status(200).json(result);
 };
 
 // GET /api/categories/:id

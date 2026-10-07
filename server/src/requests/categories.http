@@ -1,0 +1,44 @@
+@baseUrl = http://localhost:5000/api
+
+### List all categories
+GET {{baseUrl}}/categories
+
+### Create a category (201)
+POST {{baseUrl}}/categories
+Content-Type: application/json
+
+{
+  "name": "Condiments",
+  "description": "Soy sauce, vinegar, ketchup, and other sauces."
+}
+
+### Create with missing name (400 - validation error)
+POST {{baseUrl}}/categories
+Content-Type: application/json
+
+{
+  "description": "No name provided"
+}
+
+### Create duplicate name (400 - already exists)
+POST {{baseUrl}}/categories
+Content-Type: application/json
+
+{
+  "name": "Condiments"
+}
+
+### Update a category (200) - palitan ang ID
+PUT {{baseUrl}}/categories/PALITAN-NG-ID
+Content-Type: application/json
+
+{
+  "name": "Condiments & Sauces",
+  "description": "Updated description."
+}
+
+### Delete a category with products (400 - business rule) - ID ng "Rice & Grains"
+DELETE {{baseUrl}}/categories/PALITAN-NG-ID
+
+### Delete the new category (200) - ID ng "Condiments & Sauces"
+DELETE {{baseUrl}}/categories/PALITAN-NG-ID
