@@ -1,8 +1,14 @@
-﻿import { Link } from "react-router";
+import { Link } from "react-router";
 
+import api from "../../api/axios";
 import PurchaseForm from "../../components/forms/PurchaseForm";
+import type { PurchaseFormData } from "../../schemas/purchaseSchema";
 
 function CreatePurchasePage() {
+  const createPurchase = async (data: PurchaseFormData) => {
+    await api.post("/purchases", data);
+  };
+
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
       <section>
@@ -26,7 +32,7 @@ function CreatePurchasePage() {
         </p>
       </section>
 
-      <PurchaseForm mode="create" />
+      <PurchaseForm mode="create" onSubmit={createPurchase} />
     </div>
   );
 }

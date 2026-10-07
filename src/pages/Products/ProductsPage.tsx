@@ -1,14 +1,16 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 
 import ProductTable from "../../components/tables/ProductTable";
-import {
-  groceryProducts,
-} from "../../data/mockData";
+import { ErrorState, LoadingState } from "../../components/ui";
+import { useProducts } from "../../hooks/useProducts";
 
 function ProductsPage() {
+  const { products, loading, error, refetch, deleteProduct } = useProducts();
+
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
+  const [stockFilter, setStockFilter] = useState("All");
   const [sortOrder, setSortOrder] = useState("name");
 
   const formatCurrency = (value: number) =>
@@ -19,116 +21,71 @@ function ProductsPage() {
     }).format(value);
 
   const categories = Array.from(
-    new Set(
-      groceryProducts.map(
-        (product) => product.category,
-      ),
-    ),
-  );
+    new Set(products.map((product) => product.categoryName ?? "Uncategorized")),
+  ).sort();
 
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    const filtered = groceryProducts.filter(
-      (product) => {
-        const matchesSearch =
-          !query ||
-          product.name
-            .toLowerCase()
-            .includes(query) ||
-          product.category
-            .toLowerCase()
-            .includes(query);
+    const filtered = products.filter((product) => {
+      const categoryName = product.categoryName ?? "Uncategorized";
 
-        const matchesCategory =
-          categoryFilter === "All" ||
-          product.category === categoryFilter;
+      const matchesSearch =
+        !query ||
+        product.name.toLowerCase().includes(query) ||
+        categoryName.toLowerCase().includes(query);
 
-        return (
-          matchesSearch &&
-          matchesCategory
-        );
-      },
-    );
+      const matchesCategory =
+        categoryFilter === "All" || categoryName === categoryFilter;
+
+      const matchesStock =
+        stockFilter === "All" || product.stockStatus === stockFilter;
+
+      return matchesSearch && matchesCategory && matchesStock;
+    });
 
     return [...filtered].sort((a, b) => {
-      if (sortOrder === "price-high") {
-        return (
-          b.estimatedPrice -
-          a.estimatedPrice
-        );
-      }
-
-      if (sortOrder === "price-low") {
-        return (
-          a.estimatedPrice -
-          b.estimatedPrice
-        );
-      }
-
-      return a.name.localeCompare(
-        b.name,
-      );
+      if (sortOrder === "price-high") return b.price - a.price;
+      if (sortOrder === "price-low") return a.price - b.price;
+      if (sortOrder === "stock-low") return a.stock - b.stock;
+      return a.name.localeCompare(b.name);
     });
-  }, [
-    search,
-    categoryFilter,
-    sortOrder,
-  ]);
+  }, [products, search, categoryFilter, stockFilter, sortOrder]);
 
   const averagePrice =
-    groceryProducts.length > 0
-      ? groceryProducts.reduce(
-          (total, product) =>
-            total +
-            product.estimatedPrice,
-          0,
-        ) / groceryProducts.length
+    products.length > 0
+      ? products.reduce((total, product) => total + product.price, 0) / products.length
       : 0;
 
-  const highestPricedProduct =
-    groceryProducts.reduce(
-      (highest, product) =>
-        product.estimatedPrice >
-        highest.estimatedPrice
-          ? product
-          : highest,
-      groceryProducts[0],
-    );
+  const lowStockCount = products.filter(
+    (product) => product.stockStatus !== "in-stock",
+  ).length;
 
-  const lowestPricedProduct =
-    groceryProducts.reduce(
-      (lowest, product) =>
-        product.estimatedPrice <
-        lowest.estimatedPrice
-          ? product
-          : lowest,
-      groceryProducts[0],
-    );
+  const outOfStockCount = products.filter(
+    (product) => product.stockStatus === "out-of-stock",
+  ).length;
 
-  const handleDelete = (id: string) => {
-    const product =
-      groceryProducts.find(
-        (item) => item.id === id,
-      );
+  const handleDelete = async (id: string) => {
+    const product = products.find((item) => item.id === id);
+    if (!product) return;
 
-    if (!product) {
-      return;
+    if (!window.confirm(`Delete "${product.name}" from your products?`)) return;
+
+    try {
+      await deleteProduct(id);
+      window.alert("Product deleted successfully.");
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to delete product.");
     }
-
-    const confirmed =
-      window.confirm(
-        `Delete "${product.name}" from your products?`,
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
-    window.alert(
-      "Product deleted successfully.",
-    );
   };
+
+  if (loading) {
+    return <LoadingState message="Loading products..." />;
+  }
+
+  if (error) {
+    return <ErrorState message={error} onRetry={refetch} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -165,7 +122,7 @@ function ProductsPage() {
           </p>
 
           <p className="mt-2 text-2xl font-bold text-slate-900">
-            {groceryProducts.length}
+            {products.length}
           </p>
 
           <p className="mt-1 text-xs text-slate-400">
@@ -205,30 +162,22 @@ function ProductsPage() {
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-sm font-medium text-slate-500">
-            Price Range
+            Need Restocking
           </p>
 
-          <p className="mt-2 text-2xl font-bold text-slate-900">
-            {formatCurrency(
-              lowestPricedProduct?.estimatedPrice ??
-                0,
-            )}
-            {" – "}
-            {formatCurrency(
-              highestPricedProduct?.estimatedPrice ??
-                0,
-            )}
+          <p className="mt-2 text-2xl font-bold text-amber-600">
+            {lowStockCount}
           </p>
 
           <p className="mt-1 text-xs text-slate-400">
-            Lowest to highest
+            {outOfStockCount} out of stock
           </p>
         </div>
       </section>
 
       {/* Filters */}
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="grid gap-4 lg:grid-cols-[1fr_220px_180px]">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_200px_170px_180px]">
           <div>
             <label
               htmlFor="product-search"
@@ -288,6 +237,27 @@ function ProductsPage() {
 
           <div>
             <label
+              htmlFor="stock-filter"
+              className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400"
+            >
+              Stock
+            </label>
+
+            <select
+              id="stock-filter"
+              value={stockFilter}
+              onChange={(event) => setStockFilter(event.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+            >
+              <option value="All">All stock levels</option>
+              <option value="in-stock">In stock</option>
+              <option value="low-stock">Low stock</option>
+              <option value="out-of-stock">Out of stock</option>
+            </select>
+          </div>
+
+          <div>
+            <label
               htmlFor="product-sort"
               className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400"
             >
@@ -315,6 +285,10 @@ function ProductsPage() {
               <option value="price-low">
                 Price: Low to High
               </option>
+
+              <option value="stock-low">
+                Stock: Lowest First
+              </option>
             </select>
           </div>
         </div>
@@ -326,13 +300,13 @@ function ProductsPage() {
               {filteredProducts.length}
             </strong>{" "}
             of{" "}
-            {groceryProducts.length}{" "}
+            {products.length}{" "}
             products
           </p>
 
           {(search ||
-            categoryFilter !==
-              "All") && (
+            categoryFilter !== "All" ||
+            stockFilter !== "All") && (
             <button
               type="button"
               onClick={() => {
@@ -340,6 +314,7 @@ function ProductsPage() {
                 setCategoryFilter(
                   "All",
                 );
+                setStockFilter("All");
               }}
               className="w-fit text-xs font-semibold text-emerald-600 hover:text-emerald-700"
             >

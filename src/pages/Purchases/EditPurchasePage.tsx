@@ -1,37 +1,52 @@
-﻿import { Link, useParams } from "react-router";
+import { useMemo } from "react";
+import { Link, useParams } from "react-router";
 
+import api from "../../api/axios";
 import PurchaseForm from "../../components/forms/PurchaseForm";
-import { purchasesData } from "../../data/mockData";
+import { LoadingState, NotFoundCard } from "../../components/ui";
+import { useApi } from "../../hooks/useApi";
+import type { PurchaseFormData } from "../../schemas/purchaseSchema";
+import type { Purchase } from "../../types";
+import { toDateInputValue } from "../../utils/date";
 
 function EditPurchasePage() {
   const { id } = useParams();
+  const { data: purchase, loading, error } = useApi<Purchase>(`/purchases/${id}`);
 
-  const purchase = purchasesData.find(
-    (item) => item.id === id,
+  const defaultValues = useMemo<PurchaseFormData | undefined>(
+    () =>
+      purchase
+        ? {
+            storeId: purchase.storeId,
+            purchaseDate: toDateInputValue(purchase.purchaseDate),
+            notes: purchase.notes ?? "",
+            items: purchase.items.map((item) => ({
+              productId: item.productId,
+              productName: item.productName,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+            })),
+          }
+        : undefined,
+    [purchase],
   );
 
-  if (!purchase) {
+  const updatePurchase = async (data: PurchaseFormData) => {
+    await api.put(`/purchases/${id}`, data);
+  };
+
+  if (loading) {
+    return <LoadingState message="Loading purchase..." />;
+  }
+
+  if (error || !purchase) {
     return (
-      <div className="mx-auto max-w-xl rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center">
-        <p className="text-sm font-semibold text-rose-600">
-          404
-        </p>
-
-        <h1 className="mt-1 text-2xl font-bold text-rose-900">
-          Purchase Not Found
-        </h1>
-
-        <p className="mt-2 text-sm text-rose-700">
-          The purchase you are trying to edit does not exist.
-        </p>
-
-        <Link
-          to="/purchases"
-          className="mt-6 inline-flex rounded-xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white"
-        >
-          Back to Purchases
-        </Link>
-      </div>
+      <NotFoundCard
+        title="Purchase Not Found"
+        message={error ?? "The purchase you are trying to edit does not exist."}
+        backTo="/purchases"
+        backLabel="Back to Purchases"
+      />
     );
   }
 
@@ -58,20 +73,7 @@ function EditPurchasePage() {
         </p>
       </section>
 
-      <PurchaseForm
-        mode="edit"
-        defaultValues={{
-          store: purchase.store,
-          purchaseDate: purchase.purchaseDate,
-          notes: purchase.notes,
-          items: purchase.items.map((item) => ({
-            productId: item.productId,
-            productName: item.productName,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-          })),
-        }}
-      />
+      <PurchaseForm mode="edit" defaultValues={defaultValues} onSubmit={updatePurchase} />
     </div>
   );
 }

@@ -1,13 +1,17 @@
-﻿import { Link, useParams } from "react-router";
+import { Link, useParams } from "react-router";
 
-import { purchasesData } from "../../data/mockData";
+import { LoadingState, NotFoundCard } from "../../components/ui";
+import { useApi } from "../../hooks/useApi";
+import { useProducts } from "../../hooks/useProducts";
+import type { Purchase } from "../../types";
 
 function PurchaseDetailsPage() {
   const { id } = useParams();
+  const { data: purchase, loading, error } = useApi<Purchase>(`/purchases/${id}`);
+  const { products } = useProducts();
 
-  const purchase = purchasesData.find(
-    (item) => item.id === id,
-  );
+  // Look up unit and category of each item from the product list
+  const productById = new Map(products.map((product) => [product.id, product]));
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-PH", {
@@ -23,35 +27,22 @@ function PurchaseDetailsPage() {
       year: "numeric",
     }).format(new Date(value));
 
-  if (!purchase) {
+  if (loading) {
+    return <LoadingState message="Loading purchase..." />;
+  }
+
+  if (error || !purchase) {
     return (
-      <div className="mx-auto max-w-xl rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center">
-        <p className="text-sm font-semibold text-rose-600">
-          404
-        </p>
-
-        <h1 className="mt-1 text-2xl font-bold text-rose-900">
-          Purchase Not Found
-        </h1>
-
-        <p className="mt-2 text-sm text-rose-700">
-          No purchase record matches this ID.
-        </p>
-
-        <Link
-          to="/purchases"
-          className="mt-6 inline-flex rounded-xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white"
-        >
-          Back to Purchases
-        </Link>
-      </div>
+      <NotFoundCard
+        title="Purchase Not Found"
+        message={error ?? "No purchase record matches this ID."}
+        backTo="/purchases"
+        backLabel="Back to Purchases"
+      />
     );
   }
 
-  const totalAmount = purchase.items.reduce(
-    (sum, item) => sum + item.subtotal,
-    0,
-  );
+  const totalAmount = purchase.totalAmount;
 
   const totalUnits = purchase.items.reduce(
     (sum, item) => sum + item.quantity,
@@ -80,7 +71,7 @@ function PurchaseDetailsPage() {
           </p>
 
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
-            {purchase.store}
+            {purchase.storeName ?? "Unknown store"}
           </h1>
 
           <p className="mt-2 text-sm text-slate-500">
@@ -148,7 +139,7 @@ function PurchaseDetailsPage() {
             </p>
 
             <p className="mt-1 text-sm font-semibold text-slate-900">
-              {purchase.store}
+              {purchase.storeName ?? "Unknown store"}
             </p>
           </div>
 
@@ -222,19 +213,19 @@ function PurchaseDetailsPage() {
 
             <tbody className="divide-y divide-slate-100">
               {purchase.items.map((item) => (
-                <tr key={item.productId}>
+                <tr key={item.id}>
                   <td className="px-5 py-4">
                     <p className="text-sm font-semibold text-slate-900">
                       {item.productName}
                     </p>
 
                     <p className="mt-0.5 text-xs text-slate-400">
-                      {item.category}
+                      {productById.get(item.productId)?.categoryName ?? "—"}
                     </p>
                   </td>
 
                   <td className="px-5 py-4 text-right text-sm text-slate-700">
-                    {item.quantity} {item.unit}
+                    {item.quantity} {productById.get(item.productId)?.unit ?? ""}
                   </td>
 
                   <td className="px-5 py-4 text-right text-sm text-slate-700">
@@ -269,7 +260,7 @@ function PurchaseDetailsPage() {
         <div className="divide-y divide-slate-100 md:hidden">
           {purchase.items.map((item) => (
             <div
-              key={item.productId}
+              key={item.id}
               className="p-4"
             >
               <div className="flex items-start justify-between gap-4">
@@ -279,7 +270,7 @@ function PurchaseDetailsPage() {
                   </p>
 
                   <p className="mt-1 text-xs text-slate-400">
-                    {item.category}
+                    {productById.get(item.productId)?.categoryName ?? "—"}
                   </p>
                 </div>
 
@@ -295,7 +286,7 @@ function PurchaseDetailsPage() {
                   </p>
 
                   <p className="mt-1 text-sm font-semibold text-slate-900">
-                    {item.quantity} {item.unit}
+                    {item.quantity} {productById.get(item.productId)?.unit ?? ""}
                   </p>
                 </div>
 

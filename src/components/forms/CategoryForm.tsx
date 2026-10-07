@@ -1,4 +1,4 @@
-﻿import { useEffect } from "react";
+import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
@@ -11,11 +11,13 @@ import {
 interface CategoryFormProps {
   mode: "create" | "edit";
   defaultValues?: CategoryFormData;
+  onSubmit: (data: CategoryFormData) => Promise<void>;
 }
 
 function CategoryForm({
   mode,
   defaultValues,
+  onSubmit,
 }: CategoryFormProps) {
   const navigate = useNavigate();
 
@@ -23,6 +25,7 @@ function CategoryForm({
     register,
     handleSubmit,
     reset,
+    setError,
     formState: {
       errors,
       isSubmitting,
@@ -41,15 +44,17 @@ function CategoryForm({
     }
   }, [defaultValues, reset]);
 
-  const submitHandler = (
+  const submitHandler = async (
     data: CategoryFormData,
   ) => {
-    console.log(
-      mode === "create"
-        ? "Create category:"
-        : "Update category:",
-      data,
-    );
+    try {
+      await onSubmit(data);
+    } catch (err) {
+      setError("root", {
+        message: err instanceof Error ? err.message : "Failed to save category.",
+      });
+      return;
+    }
 
     window.alert(
       mode === "create"
@@ -157,6 +162,12 @@ function CategoryForm({
           to compare where your grocery budget is being spent.
         </p>
       </section>
+
+      {errors.root && (
+        <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          {errors.root.message}
+        </p>
+      )}
 
       {/* Actions */}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

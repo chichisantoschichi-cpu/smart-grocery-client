@@ -1,8 +1,14 @@
-﻿import { Link } from "react-router";
+import { Link } from "react-router";
 
+import api from "../../api/axios";
 import BudgetForm from "../../components/forms/BudgetForm";
+import type { BudgetFormData } from "../../schemas/budgetSchema";
 
 function CreateBudgetPage() {
+  const createBudget = async (data: BudgetFormData) => {
+    await api.post("/budgets", data);
+  };
+
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
       <section>
@@ -28,7 +34,7 @@ function CreateBudgetPage() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-        <BudgetForm mode="create" />
+        <BudgetForm mode="create" onSubmit={createBudget} />
       </section>
     </div>
   );

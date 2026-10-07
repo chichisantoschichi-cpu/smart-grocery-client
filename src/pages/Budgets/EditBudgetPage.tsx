@@ -1,33 +1,32 @@
-﻿import { Link, useParams } from "react-router";
+import { Link, useParams } from "react-router";
 
+import api from "../../api/axios";
 import BudgetForm from "../../components/forms/BudgetForm";
-import { budgetsData } from "../../data/mockData";
+import { LoadingState, NotFoundCard } from "../../components/ui";
+import { useApi } from "../../hooks/useApi";
+import type { BudgetFormData } from "../../schemas/budgetSchema";
+import type { Budget } from "../../types";
 
 function EditBudgetPage() {
   const { id } = useParams();
+  const { data: budget, loading, error } = useApi<Budget>(`/budgets/${id}`);
 
-  const budget = budgetsData.find(
-    (item) => item.id === id,
-  );
+  const updateBudget = async (data: BudgetFormData) => {
+    await api.put(`/budgets/${id}`, data);
+  };
 
-  if (!budget) {
+  if (loading) {
+    return <LoadingState message="Loading budget..." />;
+  }
+
+  if (error || !budget) {
     return (
-      <div className="mx-auto max-w-xl rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center">
-        <h1 className="text-2xl font-bold text-rose-900">
-          Budget Not Found
-        </h1>
-
-        <p className="mt-2 text-sm text-rose-700">
-          The budget you are trying to edit does not exist.
-        </p>
-
-        <Link
-          to="/budgets"
-          className="mt-6 inline-flex rounded-xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white"
-        >
-          Back to Budgets
-        </Link>
-      </div>
+      <NotFoundCard
+        title="Budget Not Found"
+        message={error ?? "The budget you are trying to edit does not exist."}
+        backTo="/budgets"
+        backLabel="Back to Budgets"
+      />
     );
   }
 
@@ -62,6 +61,7 @@ function EditBudgetPage() {
             year: budget.year,
             amount: budget.amount,
           }}
+          onSubmit={updateBudget}
         />
       </section>
     </div>

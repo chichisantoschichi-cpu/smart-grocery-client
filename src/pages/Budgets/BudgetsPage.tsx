@@ -1,10 +1,12 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 
 import BudgetTable from "../../components/tables/BudgetTable";
-import { budgetsData } from "../../data/mockData";
+import { ErrorState, LoadingState } from "../../components/ui";
+import { useBudgets } from "../../hooks/useBudgets";
 
 function BudgetsPage() {
+  const { budgets, loading, error, refetch, deleteBudget } = useBudgets();
   const [search, setSearch] = useState("");
 
   const formatCurrency = (value: number) =>
@@ -18,22 +20,22 @@ function BudgetsPage() {
     const query = search.trim().toLowerCase();
 
     if (!query) {
-      return budgetsData;
+      return budgets;
     }
 
-    return budgetsData.filter((budget) =>
+    return budgets.filter((budget) =>
       `${budget.month} ${budget.year}`
         .toLowerCase()
         .includes(query),
     );
-  }, [search]);
+  }, [budgets, search]);
 
-  const totalBudget = budgetsData.reduce(
+  const totalBudget = budgets.reduce(
     (total, budget) => total + budget.amount,
     0,
   );
 
-  const totalSpent = budgetsData.reduce(
+  const totalSpent = budgets.reduce(
     (total, budget) => total + budget.spent,
     0,
   );
@@ -48,25 +50,27 @@ function BudgetsPage() {
       ? (totalSpent / totalBudget) * 100
       : 0;
 
-  const handleDelete = (id: string) => {
-    const budget = budgetsData.find(
-      (item) => item.id === id,
-    );
+  const handleDelete = async (id: string) => {
+    const budget = budgets.find((item) => item.id === id);
+    if (!budget) return;
 
-    if (!budget) {
-      return;
+    if (!window.confirm(`Delete the ${budget.month} ${budget.year} budget?`)) return;
+
+    try {
+      await deleteBudget(id);
+      window.alert("Budget deleted successfully.");
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to delete budget.");
     }
-
-    const confirmed = window.confirm(
-      `Delete the ${budget.month} ${budget.year} budget?`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    window.alert("Budget deleted successfully.");
   };
+
+  if (loading) {
+    return <LoadingState message="Loading budgets..." />;
+  }
+
+  if (error) {
+    return <ErrorState message={error} onRetry={refetch} />;
+  }
 
   return (
     <div className="space-y-6">

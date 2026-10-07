@@ -1,12 +1,10 @@
-﻿import { useEffect } from "react";
+import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
 
-import {
-  groceryProducts,
-  storesData,
-} from "../../data/mockData";
+import { useProducts } from "../../hooks/useProducts";
+import { useStores } from "../../hooks/useStores";
 
 import {
   purchaseSchema,
@@ -16,6 +14,7 @@ import {
 interface PurchaseFormProps {
   mode: "create" | "edit";
   defaultValues?: PurchaseFormData;
+  onSubmit: (data: PurchaseFormData) => Promise<void>;
 }
 
 const emptyItem = {
@@ -25,11 +24,22 @@ const emptyItem = {
   unitPrice: 0,
 };
 
+// Today's date in local time as YYYY-MM-DD (toISOString would give the UTC date)
+const today = () => {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().split("T")[0];
+};
+
 function PurchaseForm({
   mode,
   defaultValues,
+  onSubmit,
 }: PurchaseFormProps) {
   const navigate = useNavigate();
+  const { products, loading: productsLoading } = useProducts();
+  const { stores, loading: storesLoading } = useStores();
+  const optionsLoading = productsLoading || storesLoading;
 
   const {
     register,
@@ -38,6 +48,7 @@ function PurchaseForm({
     reset,
     watch,
     setValue,
+    setError,
     formState: {
       errors,
       isSubmitting,
@@ -46,10 +57,8 @@ function PurchaseForm({
     resolver: zodResolver(purchaseSchema),
     defaultValues:
       defaultValues ?? {
-        store: "",
-        purchaseDate: new Date()
-          .toISOString()
-          .split("T")[0],
+        storeId: "",
+        purchaseDate: today(),
         notes: "",
         items: [emptyItem],
       },
@@ -62,17 +71,18 @@ function PurchaseForm({
 
   const watchedItems = watch("items");
 
+  // Re-apply values once the store and product options exist so the selects show them
   useEffect(() => {
-    if (defaultValues) {
+    if (defaultValues && !optionsLoading) {
       reset(defaultValues);
     }
-  }, [defaultValues, reset]);
+  }, [defaultValues, optionsLoading, reset]);
 
   const handleProductChange = (
     index: number,
     productId: string,
   ) => {
-    const product = groceryProducts.find(
+    const product = products.find(
       (item) => item.id === productId,
     );
 
@@ -92,19 +102,21 @@ function PurchaseForm({
 
     setValue(
       `items.${index}.unitPrice`,
-      product.estimatedPrice,
+      product.price,
     );
   };
 
-  const submitHandler = (
+  const submitHandler = async (
     data: PurchaseFormData,
   ) => {
-    console.log(
-      mode === "create"
-        ? "Create purchase:"
-        : "Update purchase:",
-      data,
-    );
+    try {
+      await onSubmit(data);
+    } catch (err) {
+      setError("root", {
+        message: err instanceof Error ? err.message : "Failed to save purchase.",
+      });
+      return;
+    }
 
     window.alert(
       mode === "create"
@@ -163,38 +175,39 @@ function PurchaseForm({
           {/* Store */}
           <div>
             <label
-              htmlFor="store"
+              htmlFor="storeId"
               className="mb-2 block text-sm font-semibold text-slate-700"
             >
               Store
             </label>
 
             <select
-              id="store"
-              {...register("store")}
+              id="storeId"
+              {...register("storeId")}
+              disabled={storesLoading}
               className={`w-full rounded-xl border bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 ${
-                errors.store
+                errors.storeId
                   ? "border-rose-300"
                   : "border-slate-200"
               }`}
             >
               <option value="">
-                Select store
+                {storesLoading ? "Loading stores..." : "Select store"}
               </option>
 
-              {storesData.map((store) => (
+              {stores.map((store) => (
                 <option
-                  key={store}
-                  value={store}
+                  key={store.id}
+                  value={store.id}
                 >
-                  {store}
+                  {store.name}
                 </option>
               ))}
             </select>
 
-            {errors.store && (
+            {errors.storeId && (
               <p className="mt-1.5 text-xs font-medium text-rose-600">
-                {errors.store.message}
+                {errors.storeId.message}
               </p>
             )}
           </div>
@@ -352,10 +365,10 @@ function PurchaseForm({
                       }`}
                     >
                       <option value="">
-                        Select product
+                        {productsLoading ? "Loading products..." : "Select product"}
                       </option>
 
-                      {groceryProducts.map(
+                      {products.map(
                         (product) => (
                           <option
                             key={product.id}
@@ -514,6 +527,12 @@ function PurchaseForm({
           </div>
         </div>
       </section>
+
+      {errors.root && (
+        <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          {errors.root.message}
+        </p>
+      )}
 
       {/* Actions */}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

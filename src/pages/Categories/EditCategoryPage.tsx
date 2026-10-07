@@ -1,37 +1,32 @@
-﻿import { Link, useParams } from "react-router";
+import { Link, useParams } from "react-router";
 
+import api from "../../api/axios";
 import CategoryForm from "../../components/forms/CategoryForm";
-import { categoriesData } from "../../data/categoryData";
+import { LoadingState, NotFoundCard } from "../../components/ui";
+import { useApi } from "../../hooks/useApi";
+import type { CategoryFormData } from "../../schemas/categorySchema";
+import type { Category } from "../../types";
 
 function EditCategoryPage() {
   const { id } = useParams();
+  const { data: category, loading, error } = useApi<Category>(`/categories/${id}`);
 
-  const category = categoriesData.find(
-    (item) => item.id === id,
-  );
+  const updateCategory = async (data: CategoryFormData) => {
+    await api.put(`/categories/${id}`, data);
+  };
 
-  if (!category) {
+  if (loading) {
+    return <LoadingState message="Loading category..." />;
+  }
+
+  if (error || !category) {
     return (
-      <div className="mx-auto max-w-xl rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center">
-        <p className="text-sm font-semibold text-rose-600">
-          404
-        </p>
-
-        <h1 className="mt-1 text-2xl font-bold text-rose-900">
-          Category Not Found
-        </h1>
-
-        <p className="mt-2 text-sm leading-6 text-rose-700">
-          The category you are trying to edit does not exist.
-        </p>
-
-        <Link
-          to="/categories"
-          className="mt-6 inline-flex rounded-xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white"
-        >
-          Back to Categories
-        </Link>
-      </div>
+      <NotFoundCard
+        title="Category Not Found"
+        message={error ?? "The category you are trying to edit does not exist."}
+        backTo="/categories"
+        backLabel="Back to Categories"
+      />
     );
   }
 
@@ -62,9 +57,9 @@ function EditCategoryPage() {
         mode="edit"
         defaultValues={{
           name: category.name,
-          description:
-            category.description,
+          description: category.description ?? "",
         }}
+        onSubmit={updateCategory}
       />
     </div>
   );

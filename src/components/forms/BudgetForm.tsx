@@ -1,4 +1,4 @@
-﻿import { useEffect } from "react";
+import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
@@ -11,7 +11,7 @@ import {
 interface BudgetFormProps {
   mode: "create" | "edit";
   defaultValues?: BudgetFormData;
-  onSubmit?: (data: BudgetFormData) => void;
+  onSubmit: (data: BudgetFormData) => Promise<void>;
 }
 
 const months = [
@@ -40,6 +40,7 @@ function BudgetForm({
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<BudgetFormData>({
     resolver: zodResolver(budgetSchema),
@@ -56,8 +57,15 @@ function BudgetForm({
     }
   }, [defaultValues, reset]);
 
-  const submitHandler = (data: BudgetFormData) => {
-    onSubmit?.(data);
+  const submitHandler = async (data: BudgetFormData) => {
+    try {
+      await onSubmit(data);
+    } catch (err) {
+      setError("root", {
+        message: err instanceof Error ? err.message : "Failed to save budget.",
+      });
+      return;
+    }
 
     const message =
       mode === "create"
@@ -173,6 +181,12 @@ function BudgetForm({
           </p>
         )}
       </div>
+
+      {errors.root && (
+        <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          {errors.root.message}
+        </p>
+      )}
 
       {/* Actions */}
       <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">

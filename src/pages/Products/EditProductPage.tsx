@@ -1,37 +1,48 @@
-﻿import { Link, useParams } from "react-router";
+import { useMemo } from "react";
+import { Link, useParams } from "react-router";
 
+import api from "../../api/axios";
 import ProductForm from "../../components/forms/ProductForm";
-import { groceryProducts } from "../../data/mockData";
+import { LoadingState, NotFoundCard } from "../../components/ui";
+import { useApi } from "../../hooks/useApi";
+import type { ProductFormData } from "../../schemas/productSchema";
+import type { Product } from "../../types";
 
 function EditProductPage() {
   const { id } = useParams();
+  const { data: product, loading, error } = useApi<Product>(`/products/${id}`);
 
-  const product = groceryProducts.find(
-    (item) => item.id === id,
+  const defaultValues = useMemo<ProductFormData | undefined>(
+    () =>
+      product
+        ? {
+            name: product.name,
+            categoryId: product.categoryId,
+            unit: product.unit,
+            price: product.price,
+            stock: product.stock,
+            minStock: product.minStock,
+          }
+        : undefined,
+    [product],
   );
 
-  if (!product) {
+  const updateProduct = async (data: ProductFormData) => {
+    await api.put(`/products/${id}`, data);
+  };
+
+  if (loading) {
+    return <LoadingState message="Loading product..." />;
+  }
+
+  if (error || !product) {
     return (
-      <div className="mx-auto max-w-xl rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center">
-        <p className="text-sm font-semibold text-rose-600">
-          404
-        </p>
-
-        <h1 className="mt-1 text-2xl font-bold text-rose-900">
-          Product Not Found
-        </h1>
-
-        <p className="mt-2 text-sm text-rose-700">
-          The product you are trying to edit does not exist.
-        </p>
-
-        <Link
-          to="/products"
-          className="mt-6 inline-flex rounded-xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white"
-        >
-          Back to Products
-        </Link>
-      </div>
+      <NotFoundCard
+        title="Product Not Found"
+        message={error ?? "The product you are trying to edit does not exist."}
+        backTo="/products"
+        backLabel="Back to Products"
+      />
     );
   }
 
@@ -58,16 +69,7 @@ function EditProductPage() {
         </p>
       </section>
 
-      <ProductForm
-        mode="edit"
-        defaultValues={{
-          name: product.name,
-          category: product.category,
-          unit: product.unit,
-          estimatedPrice:
-            product.estimatedPrice,
-        }}
-      />
+      <ProductForm mode="edit" defaultValues={defaultValues} onSubmit={updateProduct} />
     </div>
   );
 }

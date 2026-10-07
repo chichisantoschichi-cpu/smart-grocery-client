@@ -1,25 +1,9 @@
-﻿import { Link } from "react-router";
+import { Link } from "react-router";
 
-export interface PurchaseTableItem {
-  productId: string;
-  productName: string;
-  category: string;
-  quantity: number;
-  unit: string;
-  unitPrice: number;
-  subtotal: number;
-}
-
-export interface PurchaseTableRecord {
-  id: string;
-  store: string;
-  purchaseDate: string;
-  notes: string;
-  items: PurchaseTableItem[];
-}
+import type { Purchase } from "../../types";
 
 interface PurchaseTableProps {
-  purchases: PurchaseTableRecord[];
+  purchases: Purchase[];
   onDelete: (id: string) => void;
 }
 
@@ -95,7 +79,7 @@ function PurchaseTable({
 
                   <td className="px-5 py-4">
                     <p className="text-sm font-semibold text-slate-900">
-                      {purchase.store}
+                      {purchase.storeName ?? "Unknown store"}
                     </p>
 
                     <p className="mt-0.5 text-xs text-slate-400">
@@ -172,7 +156,7 @@ function PurchaseTable({
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-bold text-slate-900">
-                    {purchase.store}
+                    {purchase.storeName ?? "Unknown store"}
                   </p>
 
                   <p className="mt-1 text-xs text-slate-400">

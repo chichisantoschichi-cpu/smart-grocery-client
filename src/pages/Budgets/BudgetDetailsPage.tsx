@@ -1,13 +1,18 @@
-﻿import { Link, useParams } from "react-router";
+import { Link, useParams } from "react-router";
 
-import { budgetsData } from "../../data/mockData";
+import { LoadingState, NotFoundCard } from "../../components/ui";
+import { useApi } from "../../hooks/useApi";
+import type { BudgetHealth, BudgetStatus } from "../../types";
+
+const STATUS_STYLES: Record<BudgetHealth, { label: string; className: string }> = {
+  "on-track": { label: "On Track", className: "bg-emerald-50 text-emerald-700" },
+  warning: { label: "Near Limit", className: "bg-amber-50 text-amber-700" },
+  "over-budget": { label: "Over Budget", className: "bg-rose-50 text-rose-700" },
+};
 
 function BudgetDetailsPage() {
   const { id } = useParams();
-
-  const budget = budgetsData.find(
-    (item) => item.id === id,
-  );
+  const { data: budget, loading, error } = useApi<BudgetStatus>(`/budgets/${id}/status`);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-PH", {
@@ -16,55 +21,26 @@ function BudgetDetailsPage() {
       maximumFractionDigits: 0,
     }).format(value);
 
-  if (!budget) {
+  if (loading) {
+    return <LoadingState message="Loading budget..." />;
+  }
+
+  if (error || !budget) {
     return (
-      <div className="mx-auto max-w-xl rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center">
-        <p className="text-sm font-semibold text-rose-600">
-          404
-        </p>
-
-        <h1 className="mt-1 text-2xl font-bold text-rose-900">
-          Budget Not Found
-        </h1>
-
-        <p className="mt-2 text-sm text-rose-700">
-          No budget record matches this ID.
-        </p>
-
-        <Link
-          to="/budgets"
-          className="mt-6 inline-flex rounded-xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white"
-        >
-          Back to Budgets
-        </Link>
-      </div>
+      <NotFoundCard
+        title="Budget Not Found"
+        message={error ?? "No budget record matches this ID."}
+        backTo="/budgets"
+        backLabel="Back to Budgets"
+      />
     );
   }
 
   // Derived values
-  const remaining = Math.max(
-    budget.amount - budget.spent,
-    0,
-  );
-
-  const usage =
-    budget.amount > 0
-      ? (budget.spent / budget.amount) * 100
-      : 0;
-
-  let status = "On Track";
-  let statusClass = "bg-emerald-50 text-emerald-700";
-
-  if (usage >= 100) {
-    status = "Over Budget";
-    statusClass = "bg-rose-50 text-rose-700";
-  } else if (usage >= 90) {
-    status = "Near Limit";
-    statusClass = "bg-amber-50 text-amber-700";
-  } else if (usage >= 70) {
-    status = "Watch Spending";
-    statusClass = "bg-yellow-50 text-yellow-700";
-  }
+  const remaining = Math.max(budget.remaining, 0);
+  const usage = budget.percentUsed;
+  const status = STATUS_STYLES[budget.status].label;
+  const statusClass = STATUS_STYLES[budget.status].className;
 
   return (
     <div className="space-y-6">
@@ -160,7 +136,7 @@ function BudgetDetailsPage() {
             className={`h-full rounded-full ${
               usage >= 100
                 ? "bg-rose-500"
-                : usage >= 90
+                : usage >= 80
                   ? "bg-amber-500"
                   : "bg-emerald-500"
             }`}
@@ -187,10 +163,59 @@ function BudgetDetailsPage() {
         </div>
       </section>
 
+      {/* Pace and projection */}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Average per day</p>
+
+          <p className="mt-2 text-2xl font-bold text-slate-900">
+            {formatCurrency(budget.dailyAverage)}
+          </p>
+
+          <p className="mt-1 text-xs text-slate-400">
+            {budget.purchaseCount} purchase(s) over {budget.daysElapsed} day(s)
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Daily allowance left</p>
+
+          <p className="mt-2 text-2xl font-bold text-emerald-600">
+            {budget.daysRemaining > 0 ? formatCurrency(budget.dailyAllowance) : "—"}
+          </p>
+
+          <p className="mt-1 text-xs text-slate-400">
+            {budget.daysRemaining > 0
+              ? `For the remaining ${budget.daysRemaining} day(s)`
+              : "This budget period has ended"}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">
+            {budget.period === "current" ? "Projected month-end" : "Final spending"}
+          </p>
+
+          <p
+            className={`mt-2 text-2xl font-bold ${
+              budget.projectedToExceed ? "text-rose-600" : "text-slate-900"
+            }`}
+          >
+            {formatCurrency(budget.projectedSpending)}
+          </p>
+
+          <p className="mt-1 text-xs text-slate-400">
+            {budget.projectedToExceed
+              ? `${formatCurrency(budget.projectedSpending - budget.amount)} over the budget`
+              : "Within the budget"}
+          </p>
+        </div>
+      </section>
+
       {/* Insight */}
       <section
         className={`rounded-2xl border p-5 sm:p-7 ${
-          usage > 90
+          usage >= 80 || budget.projectedToExceed
             ? "border-amber-200 bg-amber-50"
             : "border-emerald-200 bg-emerald-50"
         }`}
@@ -200,13 +225,17 @@ function BudgetDetailsPage() {
         </p>
 
         <h2 className="mt-2 text-xl font-bold text-slate-900">
-          {usage > 90
-            ? "You're getting close to your budget limit."
-            : "Your spending is currently within a manageable range."}
+          {budget.status === "over-budget"
+            ? "You have gone over this budget."
+            : budget.projectedToExceed
+              ? "At this pace you will go over your budget."
+              : usage >= 80
+                ? "You're getting close to your budget limit."
+                : "Your spending is currently within a manageable range."}
         </h2>
 
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-          {usage > 90
+          {usage >= 80
             ? `You have ${formatCurrency(
                 remaining,
               )} remaining in this budget period.`

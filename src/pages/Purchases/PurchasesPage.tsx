@@ -1,10 +1,13 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 
 import PurchaseTable from "../../components/tables/PurchaseTable";
-import { purchasesData } from "../../data/mockData";
+import { ErrorState, LoadingState } from "../../components/ui";
+import { usePurchases } from "../../hooks/usePurchases";
 
 function PurchasesPage() {
+  const { purchases, loading, error, refetch, deletePurchase } = usePurchases();
+
   const [search, setSearch] = useState("");
   const [storeFilter, setStoreFilter] = useState("All");
   const [sortOrder, setSortOrder] = useState("newest");
@@ -17,17 +20,17 @@ function PurchasesPage() {
     }).format(value);
 
   const stores = Array.from(
-    new Set(purchasesData.map((purchase) => purchase.store)),
-  );
+    new Set(purchases.map((purchase) => purchase.storeName ?? "Unknown store")),
+  ).sort();
 
   const filteredPurchases = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    const filtered = purchasesData.filter(
+    const filtered = purchases.filter(
       (purchase) => {
         const matchesSearch =
           !query ||
-          purchase.store
+          (purchase.storeName ?? "")
             .toLowerCase()
             .includes(query) ||
           purchase.items.some((item) =>
@@ -38,7 +41,7 @@ function PurchasesPage() {
 
         const matchesStore =
           storeFilter === "All" ||
-          purchase.store === storeFilter;
+          (purchase.storeName ?? "Unknown store") === storeFilter;
 
         return (
           matchesSearch && matchesStore
@@ -59,21 +62,16 @@ function PurchasesPage() {
         ? dateB - dateA
         : dateA - dateB;
     });
-  }, [search, storeFilter, sortOrder]);
+  }, [purchases, search, storeFilter, sortOrder]);
 
-  const totalSpending = purchasesData.reduce(
-    (total, purchase) =>
-      total +
-      purchase.items.reduce(
-        (sum, item) => sum + item.subtotal,
-        0,
-      ),
+  const totalSpending = purchases.reduce(
+    (total, purchase) => total + purchase.totalAmount,
     0,
   );
 
-  const totalPurchases = purchasesData.length;
+  const totalPurchases = purchases.length;
 
-  const totalUnits = purchasesData.reduce(
+  const totalUnits = purchases.reduce(
     (total, purchase) =>
       total +
       purchase.items.reduce(
@@ -88,27 +86,34 @@ function PurchasesPage() {
       ? totalSpending / totalPurchases
       : 0;
 
-  const handleDelete = (id: string) => {
-    const purchase = purchasesData.find(
-      (item) => item.id === id,
-    );
+  const handleDelete = async (id: string) => {
+    const purchase = purchases.find((item) => item.id === id);
+    if (!purchase) return;
 
-    if (!purchase) {
+    const date = new Date(purchase.purchaseDate).toLocaleDateString("en-PH");
+    if (
+      !window.confirm(
+        `Delete the ${purchase.storeName} purchase from ${date}? Product stock will be reduced.`,
+      )
+    ) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Delete the ${purchase.store} purchase from ${purchase.purchaseDate}?`,
-    );
-
-    if (!confirmed) {
-      return;
+    try {
+      await deletePurchase(id);
+      window.alert("Purchase deleted successfully.");
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to delete purchase.");
     }
-
-    window.alert(
-      "Purchase deleted successfully.",
-    );
   };
+
+  if (loading) {
+    return <LoadingState message="Loading purchases..." />;
+  }
+
+  if (error) {
+    return <ErrorState message={error} onRetry={refetch} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -282,7 +287,7 @@ function PurchasesPage() {
             <strong className="text-slate-700">
               {filteredPurchases.length}
             </strong>{" "}
-            of {purchasesData.length} purchases
+            of {purchases.length} purchases
           </p>
 
           {(search || storeFilter !== "All") && (

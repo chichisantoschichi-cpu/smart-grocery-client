@@ -1,14 +1,15 @@
-﻿import { Link } from "react-router";
+import { Link } from "react-router";
 import Button from "../ui/Button";
 import Badge from "../ui/Badge";
 
-interface Budget {
-  id: string;
-  month: string;
-  year: number;
-  amount: number;
-  spent: number;
-}
+import type { Budget, BudgetHealth } from "../../types";
+
+// Labels for the status computed by the API (under 80% / 80-100% / over 100%)
+const STATUS_BADGES: Record<BudgetHealth, { label: string; className: string }> = {
+  "on-track": { label: "On Track", className: "bg-emerald-50 text-emerald-700" },
+  warning: { label: "Near Limit", className: "bg-amber-50 text-amber-700" },
+  "over-budget": { label: "Over Budget", className: "bg-rose-50 text-rose-700" },
+};
 
 interface BudgetTableProps {
   budgets: Budget[];
@@ -25,39 +26,6 @@ function BudgetTable({
       currency: "PHP",
       maximumFractionDigits: 0,
     }).format(value);
-
-  const getStatus = (amount: number, spent: number) => {
-    const usage =
-      amount > 0
-        ? (spent / amount) * 100
-        : 0;
-
-    if (usage >= 100) {
-      return {
-        label: "Over Budget",
-        className: "bg-rose-50 text-rose-700",
-      };
-    }
-
-    if (usage >= 90) {
-      return {
-        label: "Near Limit",
-        className: "bg-amber-50 text-amber-700",
-      };
-    }
-
-    if (usage >= 70) {
-      return {
-        label: "Watch Spending",
-        className: "bg-yellow-50 text-yellow-700",
-      };
-    }
-
-    return {
-      label: "On Track",
-      className: "bg-emerald-50 text-emerald-700",
-    };
-  };
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -99,10 +67,7 @@ function BudgetTable({
                 0,
               );
 
-              const status = getStatus(
-                budget.amount,
-                budget.spent,
-              );
+              const status = STATUS_BADGES[budget.status];
 
               return (
                 <tr
@@ -182,10 +147,7 @@ function BudgetTable({
               ? (budget.spent / budget.amount) * 100
               : 0;
 
-          const status = getStatus(
-            budget.amount,
-            budget.spent,
-          );
+          const status = STATUS_BADGES[budget.status];
 
           return (
             <article

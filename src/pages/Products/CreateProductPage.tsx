@@ -1,8 +1,14 @@
-﻿import { Link } from "react-router";
+import { Link } from "react-router";
 
+import api from "../../api/axios";
 import ProductForm from "../../components/forms/ProductForm";
+import type { ProductFormData } from "../../schemas/productSchema";
 
 function CreateProductPage() {
+  const createProduct = async (data: ProductFormData) => {
+    await api.post("/products", data);
+  };
+
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
       <section>
@@ -26,7 +32,7 @@ function CreateProductPage() {
         </p>
       </section>
 
-      <ProductForm mode="create" />
+      <ProductForm mode="create" onSubmit={createProduct} />
     </div>
   );
 }

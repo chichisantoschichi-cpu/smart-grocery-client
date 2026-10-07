@@ -1,7 +1,9 @@
-﻿import { useEffect } from "react";
+import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
+
+import { useCategories } from "../../hooks/useCategories";
 
 import {
   productSchema,
@@ -11,20 +13,8 @@ import {
 interface ProductFormProps {
   mode: "create" | "edit";
   defaultValues?: ProductFormData;
+  onSubmit: (data: ProductFormData) => Promise<void>;
 }
-
-const categories = [
-  "Rice & Grains",
-  "Meat & Poultry",
-  "Vegetables",
-  "Fruits",
-  "Dairy",
-  "Beverages",
-  "Bakery",
-  "Snacks",
-  "Pantry",
-  "Household",
-];
 
 const units = [
   "kg",
@@ -42,13 +32,16 @@ const units = [
 function ProductForm({
   mode,
   defaultValues,
+  onSubmit,
 }: ProductFormProps) {
   const navigate = useNavigate();
+  const { categories, loading: categoriesLoading } = useCategories();
 
   const {
     register,
     handleSubmit,
     reset,
+    setError,
     formState: {
       errors,
       isSubmitting,
@@ -57,25 +50,30 @@ function ProductForm({
     resolver: zodResolver(productSchema),
     defaultValues: defaultValues ?? {
       name: "",
-      category: "",
+      categoryId: "",
       unit: "",
-      estimatedPrice: 0,
+      price: 0,
+      stock: 0,
+      minStock: 1,
     },
   });
 
+  // Re-apply values once the category options exist so the select shows the saved category
   useEffect(() => {
-    if (defaultValues) {
+    if (defaultValues && !categoriesLoading) {
       reset(defaultValues);
     }
-  }, [defaultValues, reset]);
+  }, [defaultValues, categoriesLoading, reset]);
 
-  const submitHandler = (data: ProductFormData) => {
-    console.log(
-      mode === "create"
-        ? "Create product:"
-        : "Update product:",
-      data,
-    );
+  const submitHandler = async (data: ProductFormData) => {
+    try {
+      await onSubmit(data);
+    } catch (err) {
+      setError("root", {
+        message: err instanceof Error ? err.message : "Failed to save product.",
+      });
+      return;
+    }
 
     window.alert(
       mode === "create"
@@ -141,38 +139,39 @@ function ProductForm({
           {/* Category */}
           <div>
             <label
-              htmlFor="category"
+              htmlFor="categoryId"
               className="mb-2 block text-sm font-semibold text-slate-700"
             >
               Category
             </label>
 
             <select
-              id="category"
-              {...register("category")}
+              id="categoryId"
+              {...register("categoryId")}
+              disabled={categoriesLoading}
               className={`w-full rounded-xl border bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 ${
-                errors.category
+                errors.categoryId
                   ? "border-rose-300"
                   : "border-slate-200"
               }`}
             >
               <option value="">
-                Select category
+                {categoriesLoading ? "Loading categories..." : "Select category"}
               </option>
 
               {categories.map((category) => (
                 <option
-                  key={category}
-                  value={category}
+                  key={category.id}
+                  value={category.id}
                 >
-                  {category}
+                  {category.name}
                 </option>
               ))}
             </select>
 
-            {errors.category && (
+            {errors.categoryId && (
               <p className="mt-1.5 text-xs font-medium text-rose-600">
-                {errors.category.message}
+                {errors.categoryId.message}
               </p>
             )}
           </div>
@@ -216,13 +215,13 @@ function ProductForm({
             )}
           </div>
 
-          {/* Estimated price */}
+          {/* Price */}
           <div className="sm:col-span-2">
             <label
-              htmlFor="estimatedPrice"
+              htmlFor="price"
               className="mb-2 block text-sm font-semibold text-slate-700"
             >
-              Estimated Price
+              Current Price
             </label>
 
             <div className="relative">
@@ -231,16 +230,16 @@ function ProductForm({
               </span>
 
               <input
-                id="estimatedPrice"
+                id="price"
                 type="number"
                 min="0.01"
                 step="0.01"
-                {...register("estimatedPrice", {
+                {...register("price", {
                   valueAsNumber: true,
                 })}
                 placeholder="60"
                 className={`w-full rounded-xl border bg-white py-3 pl-9 pr-4 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 ${
-                  errors.estimatedPrice
+                  errors.price
                     ? "border-rose-300"
                     : "border-slate-200"
                 }`}
@@ -248,12 +247,82 @@ function ProductForm({
             </div>
 
             <p className="mt-1.5 text-xs text-slate-400">
-              This is used as a reference price for grocery analysis.
+              Used as the default price when adding this product to a purchase.
             </p>
 
-            {errors.estimatedPrice && (
+            {errors.price && (
               <p className="mt-1.5 text-xs font-medium text-rose-600">
-                {errors.estimatedPrice.message}
+                {errors.price.message}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label
+              htmlFor="stock"
+              className="mb-2 block text-sm font-semibold text-slate-700"
+            >
+              Stock on Hand
+            </label>
+
+            <input
+              id="stock"
+              type="number"
+              min="0"
+              step="any"
+              {...register("stock", {
+                valueAsNumber: true,
+              })}
+              placeholder="0"
+              className={`w-full rounded-xl border bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 ${
+                errors.stock
+                  ? "border-rose-300"
+                  : "border-slate-200"
+              }`}
+            />
+
+            <p className="mt-1.5 text-xs text-slate-400">
+              How many you currently have at home.
+            </p>
+
+            {errors.stock && (
+              <p className="mt-1.5 text-xs font-medium text-rose-600">
+                {errors.stock.message}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label
+              htmlFor="minStock"
+              className="mb-2 block text-sm font-semibold text-slate-700"
+            >
+              Minimum Stock
+            </label>
+
+            <input
+              id="minStock"
+              type="number"
+              min="0"
+              step="any"
+              {...register("minStock", {
+                valueAsNumber: true,
+              })}
+              placeholder="1"
+              className={`w-full rounded-xl border bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 ${
+                errors.minStock
+                  ? "border-rose-300"
+                  : "border-slate-200"
+              }`}
+            />
+
+            <p className="mt-1.5 text-xs text-slate-400">
+              Shows up in low stock when stock falls to this level.
+            </p>
+
+            {errors.minStock && (
+              <p className="mt-1.5 text-xs font-medium text-rose-600">
+                {errors.minStock.message}
               </p>
             )}
           </div>
@@ -271,10 +340,16 @@ function ProductForm({
         </h3>
 
         <p className="mt-1 text-sm leading-6 text-slate-500">
-          Your information will later be sent to the backend through
-          the product API.
+          Stock goes up automatically when this product is recorded in
+          a purchase, and low-stock items appear in the shopping list.
         </p>
       </section>
+
+      {errors.root && (
+        <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          {errors.root.message}
+        </p>
+      )}
 
       {/* Actions */}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

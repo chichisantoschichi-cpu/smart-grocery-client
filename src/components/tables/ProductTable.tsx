@@ -1,15 +1,15 @@
-﻿import { Link } from "react-router";
+import { Link } from "react-router";
 
-export interface ProductRecord {
-  id: string;
-  name: string;
-  category: string;
-  unit: string;
-  estimatedPrice: number;
-}
+import type { Product, StockStatus } from "../../types";
+
+const STOCK_BADGES: Record<StockStatus, { label: string; className: string }> = {
+  "in-stock": { label: "In stock", className: "bg-emerald-50 text-emerald-700" },
+  "low-stock": { label: "Low stock", className: "bg-amber-50 text-amber-700" },
+  "out-of-stock": { label: "Out of stock", className: "bg-rose-50 text-rose-700" },
+};
 
 interface ProductTableProps {
-  products: ProductRecord[];
+  products: Product[];
   onDelete: (id: string) => void;
 }
 
@@ -28,7 +28,7 @@ function ProductTable({
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       {/* Desktop table */}
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[760px]">
+        <table className="w-full min-w-[860px]">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/70">
               <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -43,8 +43,12 @@ function ProductTable({
                 Unit
               </th>
 
+              <th className="px-5 py-4 text-center text-xs font-bold uppercase tracking-wider text-slate-400">
+                Stock
+              </th>
+
               <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wider text-slate-400">
-                Estimated Price
+                Price
               </th>
 
               <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -65,13 +69,13 @@ function ProductTable({
                   </p>
 
                   <p className="mt-0.5 text-xs text-slate-400">
-                    Grocery product
+                    Min. stock: {product.minStock} {product.unit}
                   </p>
                 </td>
 
                 <td className="px-5 py-4">
                   <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700">
-                    {product.category}
+                    {product.categoryName ?? "Uncategorized"}
                   </span>
                 </td>
 
@@ -79,8 +83,17 @@ function ProductTable({
                   {product.unit}
                 </td>
 
+                <td className="px-5 py-4 text-center">
+                  <p className="text-sm font-semibold text-slate-900">{product.stock}</p>
+                  <span
+                    className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${STOCK_BADGES[product.stockStatus].className}`}
+                  >
+                    {STOCK_BADGES[product.stockStatus].label}
+                  </span>
+                </td>
+
                 <td className="px-5 py-4 text-right text-sm font-bold text-slate-900">
-                  {formatCurrency(product.estimatedPrice)}
+                  {formatCurrency(product.price)}
                 </td>
 
                 <td className="px-5 py-4">
@@ -121,23 +134,40 @@ function ProductTable({
                 </p>
 
                 <span className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                  {product.category}
+                  {product.categoryName ?? "Uncategorized"}
                 </span>
               </div>
 
               <p className="shrink-0 text-sm font-bold text-slate-900">
-                {formatCurrency(product.estimatedPrice)}
+                {formatCurrency(product.price)}
               </p>
             </div>
 
-            <div className="mt-4 rounded-xl bg-slate-50 p-3">
-              <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
-                Unit
-              </p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-slate-50 p-3">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                  Unit
+                </p>
 
-              <p className="mt-1 text-sm font-semibold text-slate-700">
-                {product.unit}
-              </p>
+                <p className="mt-1 text-sm font-semibold text-slate-700">
+                  {product.unit}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 p-3">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                  Stock
+                </p>
+
+                <p className="mt-1 text-sm font-semibold text-slate-700">
+                  {product.stock}{" "}
+                  <span
+                    className={`ml-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${STOCK_BADGES[product.stockStatus].className}`}
+                  >
+                    {STOCK_BADGES[product.stockStatus].label}
+                  </span>
+                </p>
+              </div>
             </div>
 
             <div className="mt-4 flex gap-2">

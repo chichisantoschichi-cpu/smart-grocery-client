@@ -1,8 +1,14 @@
-﻿import { Link } from "react-router";
+import { Link } from "react-router";
 
+import api from "../../api/axios";
 import CategoryForm from "../../components/forms/CategoryForm";
+import type { CategoryFormData } from "../../schemas/categorySchema";
 
 function CreateCategoryPage() {
+  const createCategory = async (data: CategoryFormData) => {
+    await api.post("/categories", data);
+  };
+
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
       <section>
@@ -26,7 +32,7 @@ function CreateCategoryPage() {
         </p>
       </section>
 
-      <CategoryForm mode="create" />
+      <CategoryForm mode="create" onSubmit={createCategory} />
     </div>
   );
 }
