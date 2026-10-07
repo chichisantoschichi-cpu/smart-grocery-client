@@ -1,8 +1,17 @@
-﻿import { Link } from "react-router";
+import { Link } from "react-router";
 
-import { dashboardData, purchasesData } from "../../data/mockData";
+import { ErrorState, LoadingState } from "../../components/ui";
+import { useApi } from "../../hooks/useApi";
+import { useProducts } from "../../hooks/useProducts";
+import { usePurchases } from "../../hooks/usePurchases";
+import type { AnalyticsSummary, CategoryBreakdown } from "../../types";
 
 function SpendingAnalysisPage() {
+  const breakdownQuery = useApi<CategoryBreakdown>("/analytics/category-breakdown");
+  const summaryQuery = useApi<AnalyticsSummary>("/analytics/summary");
+  const purchasesQuery = usePurchases();
+  const { products } = useProducts();
+
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-PH", {
       style: "currency",
@@ -10,75 +19,73 @@ function SpendingAnalysisPage() {
       maximumFractionDigits: 0,
     }).format(value);
 
-  const categoryMap = new Map<
-    string,
-    number
-  >();
+  if (breakdownQuery.loading || summaryQuery.loading || purchasesQuery.loading) {
+    return <LoadingState message="Loading spending analysis..." />;
+  }
+
+  const error = breakdownQuery.error ?? summaryQuery.error ?? purchasesQuery.error;
+  if (error || !breakdownQuery.data || !summaryQuery.data) {
+    return (
+      <ErrorState
+        message={error ?? "No analytics data."}
+        onRetry={() => {
+          breakdownQuery.refetch();
+          summaryQuery.refetch();
+          purchasesQuery.refetch();
+        }}
+      />
+    );
+  }
+
+  const summary = summaryQuery.data;
+
+  // Category totals and percentages are computed by the API
+  const categoriesWithPercentage = breakdownQuery.data.categories.map((category) => ({
+    name: category.name,
+    amount: category.total,
+    percentage: category.percent,
+  }));
+
+  const totalSpending = breakdownQuery.data.total;
+
+  // Product totals across all purchases
+  const categoryByProductId = new Map(
+    products.map((product) => [product.id, product.categoryName ?? "Uncategorized"]),
+  );
 
   const productMap = new Map<
     string,
     {
+      id: string;
+      name: string;
       amount: number;
       purchases: number;
       category: string;
     }
   >();
 
-  purchasesData.forEach((purchase) => {
+  purchasesQuery.purchases.forEach((purchase) => {
     purchase.items.forEach((item) => {
-      categoryMap.set(
-        item.category,
-        (categoryMap.get(item.category) ?? 0) +
-          item.subtotal,
-      );
-
-      const existingProduct =
-        productMap.get(item.productName);
+      const existingProduct = productMap.get(item.productId);
 
       if (existingProduct) {
         existingProduct.amount += item.subtotal;
         existingProduct.purchases += 1;
       } else {
-        productMap.set(item.productName, {
+        productMap.set(item.productId, {
+          id: item.productId,
+          name: item.productName,
           amount: item.subtotal,
           purchases: 1,
-          category: item.category,
+          category: categoryByProductId.get(item.productId) ?? "—",
         });
       }
     });
   });
 
-  const categoryAnalysis = Array.from(
-    categoryMap.entries(),
-  )
-    .map(([name, amount]) => ({
-      name,
-      amount,
-    }))
-    .sort((a, b) => b.amount - a.amount);
-
-  const totalSpending = categoryAnalysis.reduce(
-    (sum, category) => sum + category.amount,
-    0,
+  const productAnalysis = Array.from(productMap.values()).sort(
+    (a, b) => b.amount - a.amount,
   );
-
-  const categoriesWithPercentage =
-    categoryAnalysis.map((category) => ({
-      ...category,
-      percentage:
-        totalSpending > 0
-          ? (category.amount / totalSpending) * 100
-          : 0,
-    }));
-
-  const productAnalysis = Array.from(
-    productMap.entries(),
-  )
-    .map(([name, data]) => ({
-      name,
-      ...data,
-    }))
-    .sort((a, b) => b.amount - a.amount);
 
   const highestCategory =
     categoriesWithPercentage[0];
@@ -88,10 +95,7 @@ function SpendingAnalysisPage() {
       categoriesWithPercentage.length - 1
     ];
 
-  const averagePurchase =
-    purchasesData.length > 0
-      ? totalSpending / purchasesData.length
-      : 0;
+  const averagePurchase = summary.averagePerPurchase;
 
   const maxCategoryAmount = Math.max(
     ...categoriesWithPercentage.map(
@@ -263,7 +267,7 @@ function SpendingAnalysisPage() {
             {productAnalysis.map(
               (product, index) => (
                 <div
-                  key={product.name}
+                  key={product.id}
                   className="flex items-center gap-4 px-5 py-4 sm:px-6"
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-xs font-bold text-emerald-700">
@@ -314,17 +318,17 @@ function SpendingAnalysisPage() {
 
           <div className="mt-6 rounded-2xl bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold text-slate-400">
-              Current dashboard spending
+              Most visited store
             </p>
 
             <p className="mt-1 text-xl font-bold text-slate-900">
-              {formatCurrency(
-                dashboardData.spending.total,
-              )}
+              {summary.mostVisitedStore?.name ?? "No purchases yet"}
             </p>
 
             <p className="mt-1 text-xs text-slate-400">
-              Based on the current month
+              {summary.mostVisitedStore
+                ? `${summary.mostVisitedStore.visits} recorded trips`
+                : "Record a purchase to see this"}
             </p>
           </div>
 

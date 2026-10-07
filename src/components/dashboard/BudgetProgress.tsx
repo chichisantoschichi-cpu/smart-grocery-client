@@ -1,4 +1,4 @@
-﻿interface BudgetProgressProps {
+interface BudgetProgressProps {
   budget: number;
   spent: number;
 }
@@ -11,15 +11,13 @@ function BudgetProgress({ budget, spent }: BudgetProgressProps) {
   let status = "On Track";
   let statusClass = "bg-emerald-50 text-emerald-700";
 
-  if (usage >= 100) {
+  // Same thresholds as the API: over 100% = over budget, 80% and up = near limit
+  if (usage > 100) {
     status = "Over Budget";
     statusClass = "bg-rose-50 text-rose-700";
-  } else if (usage >= 90) {
+  } else if (usage >= 80) {
     status = "Near Limit";
     statusClass = "bg-amber-50 text-amber-700";
-  } else if (usage >= 70) {
-    status = "Watch Spending";
-    statusClass = "bg-yellow-50 text-yellow-700";
   }
 
   const formatCurrency = (value: number) =>

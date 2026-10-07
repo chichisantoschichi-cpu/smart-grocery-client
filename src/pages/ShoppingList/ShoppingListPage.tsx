@@ -2,24 +2,81 @@ import { useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 
-import {
-  groceryProducts,
-} from "../../data/mockData";
-
-import {
-  initialShoppingList,
-  type ShoppingListItem,
-} from "../../data/shoppingListData";
+import { ErrorState, LoadingState } from "../../components/ui";
+import { useApi } from "../../hooks/useApi";
+import { useProducts } from "../../hooks/useProducts";
+import type { LowStockResponse, Product } from "../../types";
 
 import {
   shoppingListItemSchema,
   type ShoppingListItemFormData,
 } from "../../schemas/shoppingListSchema";
 
+interface ShoppingListItem {
+  id: string;
+  productId: string;
+  productName: string;
+  category: string;
+  unit: string;
+  quantity: number;
+  estimatedPrice: number;
+  checked: boolean;
+}
+
+// Loads products and the low-stock suggestions, then starts the list with them
 function ShoppingListPage() {
-  const [items, setItems] = useState<ShoppingListItem[]>(
-    initialShoppingList,
+  const productsQuery = useProducts();
+  const lowStockQuery = useApi<LowStockResponse>("/products/low-stock");
+
+  if (productsQuery.loading || lowStockQuery.loading) {
+    return <LoadingState message="Building your shopping list..." />;
+  }
+
+  const error = productsQuery.error ?? lowStockQuery.error;
+  if (error || !lowStockQuery.data) {
+    return (
+      <ErrorState
+        message={error ?? "Could not load low-stock products."}
+        onRetry={() => {
+          productsQuery.refetch();
+          lowStockQuery.refetch();
+        }}
+      />
+    );
+  }
+
+  const initialItems: ShoppingListItem[] = lowStockQuery.data.products.map((product) => ({
+    id: `list-${product.id}`,
+    productId: product.id,
+    productName: product.name,
+    category: product.categoryName ?? "Uncategorized",
+    unit: product.unit,
+    quantity: product.suggestedQuantity,
+    estimatedPrice: product.price,
+    checked: false,
+  }));
+
+  return (
+    <ShoppingListContent
+      products={productsQuery.products}
+      initialItems={initialItems}
+      lowStockCount={lowStockQuery.data.count}
+    />
   );
+}
+
+interface ShoppingListContentProps {
+  products: Product[];
+  initialItems: ShoppingListItem[];
+  lowStockCount: number;
+}
+
+function ShoppingListContent({
+  products,
+  initialItems,
+  lowStockCount,
+}: ShoppingListContentProps) {
+  const [items, setItems] = useState<ShoppingListItem[]>(initialItems);
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] =
@@ -202,7 +259,7 @@ function ShoppingListPage() {
     data: ShoppingListItemFormData,
   ) => {
     const product =
-      groceryProducts.find(
+      products.find(
         (item) =>
           item.id ===
           data.productId,
@@ -243,13 +300,13 @@ function ShoppingListPage() {
           productName:
             product.name,
           category:
-            product.category,
+            product.categoryName ?? "Uncategorized",
           unit:
             product.unit,
           quantity:
             data.quantity,
           estimatedPrice:
-            product.estimatedPrice,
+            product.price,
           checked: false,
         },
       ]);
@@ -280,7 +337,8 @@ function ShoppingListPage() {
 
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
             Plan your next grocery trip and estimate how much
-            your shopping list may cost.
+            your shopping list may cost. {lowStockCount} low-stock
+            product(s) were added automatically.
           </p>
         </div>
 
@@ -439,14 +497,14 @@ function ShoppingListPage() {
                 Select a product
               </option>
 
-              {groceryProducts.map(
+              {products.map(
                 (product) => (
                   <option
                     key={product.id}
                     value={product.id}
                   >
                     {product.name} � ?
-                    {product.estimatedPrice}
+                    {product.price}
                     /{product.unit}
                   </option>
                 ),

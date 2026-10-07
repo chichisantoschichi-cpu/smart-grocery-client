@@ -1,17 +1,54 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 
-import { priceHistoryData } from "../../data/analyticsData";
+import { ErrorState, LoadingState } from "../../components/ui";
+import { useApi } from "../../hooks/useApi";
+import { useProducts } from "../../hooks/useProducts";
+import { usePurchases } from "../../hooks/usePurchases";
+import type { PriceHistory } from "../../types";
+
+const monthLabel = (iso: string) =>
+  new Intl.DateTimeFormat("en-PH", { month: "short", year: "2-digit" }).format(new Date(iso));
 
 function PriceTrendsPage() {
-  const [selectedProduct, setSelectedProduct] =
-    useState(
-      priceHistoryData[0]?.product ?? "",
-    );
+  const productsQuery = useProducts();
+  const purchasesQuery = usePurchases();
+  const [selectedProduct, setSelectedProduct] = useState("");
 
-  const product = priceHistoryData.find(
-    (item) =>
-      item.product === selectedProduct,
+  // Latest price paid vs the purchase before it, for every product that has been bought
+  const productSummary = useMemo(() => {
+    const pricesByProduct = new Map<string, { date: number; price: number }[]>();
+    for (const purchase of purchasesQuery.purchases) {
+      for (const item of purchase.items) {
+        const list = pricesByProduct.get(item.productId) ?? [];
+        list.push({ date: new Date(purchase.purchaseDate).getTime(), price: item.unitPrice });
+        pricesByProduct.set(item.productId, list);
+      }
+    }
+
+    return productsQuery.products
+      .filter((product) => pricesByProduct.has(product.id))
+      .map((product) => {
+        const prices = pricesByProduct.get(product.id)!.sort((a, b) => a.date - b.date);
+        const latest = prices[prices.length - 1].price;
+        const previous = prices[prices.length - 2]?.price ?? 0;
+        const change = previous > 0 ? ((latest - previous) / previous) * 100 : 0;
+
+        return {
+          id: product.id,
+          product: product.name,
+          unit: product.unit,
+          latest,
+          change,
+        };
+      });
+  }, [productsQuery.products, purchasesQuery.purchases]);
+
+  // Default to the first product until the user picks one
+  const productId = selectedProduct || productSummary[0]?.id || "";
+
+  const historyQuery = useApi<PriceHistory>(
+    productId ? `/products/${productId}/price-history` : null,
   );
 
   const formatCurrency = (value: number) =>
@@ -21,7 +58,37 @@ function PriceTrendsPage() {
       maximumFractionDigits: 2,
     }).format(value);
 
-  const history = product?.history ?? [];
+  if (productsQuery.loading || purchasesQuery.loading) {
+    return <LoadingState message="Loading price trends..." />;
+  }
+
+  const listError = productsQuery.error ?? purchasesQuery.error;
+  if (listError) {
+    return (
+      <ErrorState
+        message={listError}
+        onRetry={() => {
+          productsQuery.refetch();
+          purchasesQuery.refetch();
+        }}
+      />
+    );
+  }
+
+  const product = productsQuery.products.find((item) => item.id === productId);
+  const stats = historyQuery.data?.stats ?? null;
+
+  // Average price paid per month for the chart
+  const monthlyPrices = new Map<string, { total: number; count: number }>();
+  for (const entry of historyQuery.data?.history ?? []) {
+    const key = monthLabel(entry.date);
+    const current = monthlyPrices.get(key) ?? { total: 0, count: 0 };
+    monthlyPrices.set(key, { total: current.total + entry.unitPrice, count: current.count + 1 });
+  }
+  const history = Array.from(monthlyPrices.entries()).map(([month, value]) => ({
+    month,
+    price: Math.round((value.total / value.count) * 100) / 100,
+  }));
 
   const currentPrice =
     history[history.length - 1]?.price ?? 0;
@@ -37,38 +104,11 @@ function PriceTrendsPage() {
       ? (priceChange / previousPrice) * 100
       : 0;
 
-  const highestPrice =
-    history.length > 0
-      ? Math.max(
-          ...history.map(
-            (item) => item.price,
-          ),
-        )
-      : 0;
-
-  const lowestPrice =
-    history.length > 0
-      ? Math.min(
-          ...history.map(
-            (item) => item.price,
-          ),
-        )
-      : 0;
-
-  const averagePrice =
-    history.length > 0
-      ? history.reduce(
-          (sum, item) =>
-            sum + item.price,
-          0,
-        ) / history.length
-      : 0;
-
-  const trend =
-    history.length >= 2
-      ? history[history.length - 1].price -
-        history[0].price
-      : 0;
+  // Min, max, average and overall trend are computed by the API
+  const highestPrice = stats?.highest ?? 0;
+  const lowestPrice = stats?.lowest ?? 0;
+  const averagePrice = stats?.average ?? 0;
+  const trend = stats?.changeAmount ?? 0;
 
   const trendLabel =
     trend > 0
@@ -91,38 +131,6 @@ function PriceTrendsPage() {
       ),
       1,
     );
-
-  const productSummary = useMemo(
-    () =>
-      priceHistoryData.map(
-        (item) => {
-          const latest =
-            item.history[
-              item.history.length - 1
-            ]?.price ?? 0;
-
-          const previous =
-            item.history[
-              item.history.length - 2
-            ]?.price ?? 0;
-
-          const change =
-            previous > 0
-              ? ((latest - previous) /
-                  previous) *
-                100
-              : 0;
-
-          return {
-            product: item.product,
-            unit: item.unit,
-            latest,
-            change,
-          };
-        },
-      ),
-    [],
-  );
 
   return (
     <div className="space-y-6">
@@ -165,7 +173,7 @@ function PriceTrendsPage() {
           </div>
 
           <select
-            value={selectedProduct}
+            value={productId}
             onChange={(event) =>
               setSelectedProduct(
                 event.target.value,
@@ -173,11 +181,11 @@ function PriceTrendsPage() {
             }
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 sm:max-w-xs"
           >
-            {priceHistoryData.map(
+            {productSummary.map(
               (item) => (
                 <option
-                  key={item.product}
-                  value={item.product}
+                  key={item.id}
+                  value={item.id}
                 >
                   {item.product}
                 </option>
@@ -296,12 +304,12 @@ function PriceTrendsPage() {
               </p>
 
               <h2 className="mt-1 text-xl font-bold text-slate-900">
-                {product?.product ?? "Product"} price history
+                {product?.name ?? "Product"} price history
               </h2>
             </div>
 
             <span className="text-xs text-slate-400">
-              6 months
+              {historyQuery.loading ? "Loading..." : `${history.length} month(s)`}
             </span>
           </div>
 
@@ -428,7 +436,7 @@ function PriceTrendsPage() {
               {productSummary.map(
                 (item) => (
                   <tr
-                    key={item.product}
+                    key={item.id}
                     className="transition hover:bg-slate-50/70"
                   >
                     <td className="px-5 py-4">
@@ -490,7 +498,7 @@ function PriceTrendsPage() {
           {productSummary.map(
             (item) => (
               <div
-                key={item.product}
+                key={item.id}
                 className="p-4"
               >
                 <div className="flex items-start justify-between gap-4">
