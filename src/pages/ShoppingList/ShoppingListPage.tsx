@@ -670,7 +670,22 @@ function ShoppingListContent({
                           : "border-slate-300 bg-white text-transparent hover:border-emerald-400"
                       }`}
                     >
-                      ?
+                      {item.checked && (
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          className="h-4 w-4"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="m5 12 4 4L19 6"
+                          />
+                        </svg>
+                      )}
                     </button>
 
                     <div className="min-w-0 flex-1">
