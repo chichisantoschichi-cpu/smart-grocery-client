@@ -482,7 +482,7 @@ function LandingPage() {
                         <div
                           className="h-full rounded-full bg-emerald-500"
                           style={{
-                            width: `${category.percentage * 3}%`,
+                            width: `${category.percentage}%`,
                           }}
                         />
                       </div>
