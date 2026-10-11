@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 
-import { ErrorState, LoadingState } from "../../components/ui";
+import { EmptyState, ErrorState, LoadingState } from "../../components/ui";
 import { useApi } from "../../hooks/useApi";
 import { useProducts } from "../../hooks/useProducts";
 import type { LowStockResponse, Product } from "../../types";
@@ -29,7 +29,7 @@ function ShoppingListPage() {
   const lowStockQuery = useApi<LowStockResponse>("/products/low-stock");
 
   if (productsQuery.loading || lowStockQuery.loading) {
-    return <LoadingState message="Building your shopping list..." />;
+    return <LoadingState message="Building your shopping list..." variant="cards" />;
   }
 
   const error = productsQuery.error ?? lowStockQuery.error;
@@ -774,37 +774,28 @@ function ShoppingListContent({
           )}
         </section>
       ) : (
-        <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-xl text-slate-400">
-            ?
-          </div>
-
-          <h2 className="mt-5 text-xl font-bold text-slate-900">
-            No shopping items found
-          </h2>
-
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-            Try another search or category, or add a new grocery
-            item to your list.
-          </p>
-
-          {(search ||
-            categoryFilter !==
-              "All") && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearch("");
-                setCategoryFilter(
-                  "All",
-                );
-              }}
-              className="mt-5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white"
-            >
-              Clear Filters
-            </button>
-          )}
-        </section>
+        <EmptyState
+          title={items.length === 0 ? "Your shopping list is empty" : "No items match your filters"}
+          description={
+            items.length === 0
+              ? "Add grocery items using the form above to plan your next shopping trip."
+              : "Try a different search or category, or clear your filters."
+          }
+          action={
+            search || categoryFilter !== "All" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setCategoryFilter("All");
+                }}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+              >
+                Clear filters
+              </button>
+            ) : undefined
+          }
+        />
       )}
     </div>
   );

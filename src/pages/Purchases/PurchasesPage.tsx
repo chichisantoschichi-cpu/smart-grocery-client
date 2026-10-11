@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router";
 
 import PurchaseTable from "../../components/tables/PurchaseTable";
-import { ErrorState, LoadingState } from "../../components/ui";
+import { EmptyState, ErrorState, LoadingState } from "../../components/ui";
 import { usePurchases } from "../../hooks/usePurchases";
 
 function PurchasesPage() {
@@ -108,7 +108,7 @@ function PurchasesPage() {
   };
 
   if (loading) {
-    return <LoadingState message="Loading purchases..." />;
+    return <LoadingState message="Loading purchases..." variant="table" />;
   }
 
   if (error) {
@@ -312,19 +312,35 @@ function PurchasesPage() {
           onDelete={handleDelete}
         />
       ) : (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-xl text-slate-400">
-            ₱
-          </div>
-
-          <h3 className="mt-4 text-lg font-bold text-slate-900">
-            No purchases found
-          </h3>
-
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-            Try adjusting your search or store filter.
-          </p>
-        </div>
+        <EmptyState
+          title={purchases.length === 0 ? "No purchases yet" : "No purchases match your filters"}
+          description={
+            purchases.length === 0
+              ? "Record your first grocery purchase to start tracking your spending."
+              : "Try a different search or store filter."
+          }
+          action={
+            purchases.length === 0 ? (
+              <Link
+                to="/purchases/new"
+                className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+              >
+                Record first purchase
+              </Link>
+            ) : search || storeFilter !== "All" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setStoreFilter("All");
+                }}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+              >
+                Clear filters
+              </button>
+            ) : undefined
+          }
+        />
       )}
     </div>
   );

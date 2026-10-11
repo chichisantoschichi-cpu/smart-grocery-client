@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router";
 
 import ProductTable from "../../components/tables/ProductTable";
-import { ErrorState, LoadingState } from "../../components/ui";
+import { EmptyState, ErrorState, LoadingState } from "../../components/ui";
 import { useProducts } from "../../hooks/useProducts";
 
 function ProductsPage() {
@@ -80,7 +80,7 @@ function ProductsPage() {
   };
 
   if (loading) {
-    return <LoadingState message="Loading products..." />;
+    return <LoadingState message="Loading products..." variant="table" />;
   }
 
   if (error) {
@@ -325,30 +325,42 @@ function ProductsPage() {
       </section>
 
       {/* Product list */}
-      {filteredProducts.length >
-      0 ? (
+      {filteredProducts.length > 0 ? (
         <ProductTable
-          products={
-            filteredProducts
-          }
-          onDelete={
-            handleDelete
-          }
+          products={filteredProducts}
+          onDelete={handleDelete}
         />
       ) : (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-xl text-slate-400">
-            ◉
-          </div>
-
-          <h3 className="mt-4 text-lg font-bold text-slate-900">
-            No products found
-          </h3>
-
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-            Try another search term or category filter.
-          </p>
-        </div>
+        <EmptyState
+          title={products.length === 0 ? "No products yet" : "No products match your filters"}
+          description={
+            products.length === 0
+              ? "Add your grocery products to start tracking prices and stock."
+              : "Try changing your search, category, or stock filter."
+          }
+          action={
+            products.length === 0 ? (
+              <Link
+                to="/products/new"
+                className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+              >
+                Add first product
+              </Link>
+            ) : search || categoryFilter !== "All" || stockFilter !== "All" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setCategoryFilter("All");
+                  setStockFilter("All");
+                }}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+              >
+                Clear filters
+              </button>
+            ) : undefined
+          }
+        />
       )}
     </div>
   );
