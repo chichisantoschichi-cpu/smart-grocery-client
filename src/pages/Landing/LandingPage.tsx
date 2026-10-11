@@ -1,4 +1,4 @@
-﻿import { Link } from "react-router";
+import { Link } from "react-router";
 
 const features = [
   {
@@ -353,12 +353,13 @@ function LandingPage() {
                 </p>
 
                 <Link
-                  to="/dashboard"
-                  className="mt-7 inline-flex items-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-                >
-                  Start exploring
-                  <span className="ml-2">→</span>
-                </Link>
+  to="/dashboard"
+  className="mt-7 inline-flex items-center justify-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold !text-white transition hover:bg-slate-800"
+  style={{ color: "#ffffff" }}
+>
+  Start exploring
+  <span className="ml-2" style={{ color: "#ffffff" }}>→</span>
+</Link>
               </div>
 
               <div className="grid gap-4">
